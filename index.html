@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=20261112f" />
+  <link rel="stylesheet" href="styles.css?v=20261112g" />
 </head>
 <body>
   <header class="top">
@@ -24,11 +24,9 @@
     <label class="radius">
       반경
       <select id="radius">
-        <option value="1">1m</option>
-        <option value="2">2m</option>
-        <option value="3">3m</option>
-        <option value="4">4m</option>
-        <option value="5" selected>5m</option>
+        <!-- 걷는 속도 75m/분 기준 -->
+        <option value="75">도보 1분 (75m)</option>
+        <option value="150" selected>도보 2분 (150m)</option>
       </select>
     </label>
   </header>
@@ -60,6 +58,6 @@
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="js/app.js?v=20261112f"></script>
+  <script type="module" src="js/app.js?v=20261112g"></script>
 </body>
 </html>

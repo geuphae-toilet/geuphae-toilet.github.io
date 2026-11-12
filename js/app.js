@@ -1,5 +1,5 @@
-import { activeRegions, regionOf } from "./regions.js?v=20261112f";
-import { loadRegion } from "./dataSource.js?v=20261112f";
+import { activeRegions, regionOf } from "./regions.js?v=20261112g";
+import { loadRegion } from "./dataSource.js?v=20261112g";
 
 const $ = (id) => document.getElementById(id);
 const DEFAULT = activeRegions()[0];
@@ -141,7 +141,8 @@ function statusText() {
   const accWarn = origin.fromGps && acc > radius ? ` 현재 위치 오차(약 ±${acc}m)가 반경(${fmtDist(radius)})보다 커서 결과가 정확하지 않을 수 있어요.` : "";
   const list = filtered();
   if (!list.length) {
-    return `${fmtDist(radius)} 안에 ${toilets.length ? "조건에 맞는 " : ""}화장실이 없어요. 위 주황 버튼은 반경 밖의 가장 가까운 곳으로 안내해요.${accWarn}`;
+    const label = $("radius").selectedOptions[0]?.text || fmtDist(radius);
+    return `${label} 안에 ${toilets.length ? "조건에 맞는 " : ""}화장실이 없어요. 위 주황 버튼은 반경 밖의 가장 가까운 곳으로 안내해요.${accWarn}`;
   }
   const count = `${list.length}곳${list.length !== toilets.length ? ` (전체 ${toilets.length}곳 중)` : ""}`;
   if (!origin.fromGps) {
@@ -223,8 +224,8 @@ function onPosition(pos) {
   origin = { lat, lng, fromGps: true };
   meMarker.setLatLng([lat, lng]);
   if (followMap) {
-    // 위치가 아주 부정확하면 넓게, 아니면 반경(1~5m)과 가장 가까운 곳이 보이게 크게 확대
-    map.setView([lat, lng], acc > 300 ? 16 : 18);
+    // 위치가 아주 부정확하면 넓게, 아니면 도보 2분 반경이 보이게
+    map.setView([lat, lng], acc > 300 ? 16 : 17);
     followMap = false;
   }
   if (!searchedAt || distance(searchedAt, origin) > RESEARCH_MOVE_M || !allSorted.length) {
@@ -297,7 +298,7 @@ $("locate").addEventListener("click", locate);
 // 반경을 바꾸면 그 반경이 잘 보이는 확대 수준으로 지도를 맞춤
 $("radius").addEventListener("change", () => {
   const r = Number($("radius").value);
-  map.setView([origin.lat, origin.lng], 19); // 반경이 1~5m라 항상 최대 확대
+  map.setView([origin.lat, origin.lng], Number($("radius").value) <= 75 ? 18 : 17); // 반경 원이 화면에 꽉 차게
   search();
 });
 ["fFree", "f24", "fAcc", "fBaby"].forEach((id) => $(id).addEventListener("change", render));
