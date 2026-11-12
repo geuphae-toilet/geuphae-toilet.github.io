@@ -1,5 +1,5 @@
-import { activeRegions, regionOf } from "./regions.js?v=20261112e";
-import { loadRegion } from "./dataSource.js?v=20261112e";
+import { activeRegions, regionOf } from "./regions.js?v=20261112f";
+import { loadRegion } from "./dataSource.js?v=20261112f";
 
 const $ = (id) => document.getElementById(id);
 const DEFAULT = activeRegions()[0];
