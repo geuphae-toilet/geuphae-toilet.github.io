@@ -2,7 +2,7 @@
 
 과민성 대장증후군(IBS) 등으로 급하게 화장실이 필요한 사람을 위한 근처 화장실 찾기 웹앱. 현재 지원 지역은 서울특별시입니다.
 
-**바로 쓰기: https://joheijin1209.github.io/seoul-toilet/**
+**바로 쓰기: https://geuphae-toilet.github.io/**
 
 ## 실행
 
