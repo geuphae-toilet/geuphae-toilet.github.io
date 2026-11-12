@@ -1,5 +1,5 @@
-import { activeRegions, regionOf } from "./regions.js?v=20261112h";
-import { loadRegion } from "./dataSource.js?v=20261112h";
+import { activeRegions, regionOf } from "./regions.js?v=20261113b";
+import { loadRegion } from "./dataSource.js?v=20261113b";
 
 const $ = (id) => document.getElementById(id);
 const DEFAULT = activeRegions()[0];
@@ -245,15 +245,91 @@ function onPosition(pos) {
 }
 
 function onPositionError(err) {
+  if (err.code === err.PERMISSION_DENIED) {
+    stopWatch();
+    showLocSheet("denied");
+    return;
+  }
   if (gps) return; // 이미 위치를 받은 적이 있으면 일시적인 오류는 무시
-  if (err.code === err.PERMISSION_DENIED) stopWatch();
-  origin = { lat: DEFAULT.center[0], lng: DEFAULT.center[1], fromGps: false };
-  map.setView(DEFAULT.center, 16);
-  const why = err.code === err.PERMISSION_DENIED
-    ? "위치 권한이 없어 서울시청 기준으로 보여드려요. 휴대폰 설정에서 브라우저의 위치 권한을 켜 주세요."
-    : "위치를 아직 못 잡았어요. 서울시청 기준으로 먼저 보여드려요.";
-  search().then(() => { $("status").textContent = why + " " + $("status").textContent; });
+  if (err.code === err.POSITION_UNAVAILABLE) {
+    // 권한은 있지만 휴대폰 자체의 위치 서비스가 꺼져 있는 경우가 많음
+    showLocSheet("denied", "휴대폰의 위치 서비스가 꺼져 있는 것 같아요. 아래 방법으로 켠 뒤 다시 시도를 눌러 주세요.");
+    return;
+  }
+  $("status").textContent = "위치를 아직 못 잡았어요. 잠시 기다리거나 창가·밖으로 나가 보세요. " + statusText();
 }
+
+// ── 위치 권한 안내 ─────────────────────────────────
+let wantGps = false; // 사용자가 위치 사용에 동의했는지 (나중에를 누르면 false)
+const ua = navigator.userAgent;
+const isIos = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/.test(ua);
+const isInApp = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp/i.test(ua);
+
+function showLocSheet(mode, why) {
+  $("locAsk").hidden = mode !== "ask";
+  $("locDenied").hidden = mode !== "denied";
+  if (mode === "denied") {
+    $("locDeniedWhy").innerHTML = why ? esc(why)
+      : "브라우저에서 이 사이트의 위치 사용이 막혀 있어요. 아래 방법으로 켠 뒤 <b>다시 시도</b>를 눌러 주세요.";
+    $("locInApp").hidden = !isInApp;
+    $("locStepsIos").hidden = !isIos;
+    $("locStepsAndroid").hidden = !isAndroid;
+    $("locStepsOther").hidden = isIos || isAndroid;
+  }
+  $("locSheet").hidden = false;
+  (mode === "ask" ? $("locAllow") : $("locRetry")).focus();
+}
+function hideLocSheet() {
+  $("locSheet").hidden = true;
+}
+
+async function permissionState() {
+  try {
+    const p = await navigator.permissions.query({ name: "geolocation" });
+    // 사용자가 브라우저 설정에서 바꾸면 바로 반영
+    p.onchange = () => {
+      if (p.state === "granted") { hideLocSheet(); wantGps = true; startWatch(); }
+    };
+    return p.state; // "granted" | "prompt" | "denied"
+  } catch {
+    return "unknown"; // 권한 조회를 지원하지 않는 브라우저 (예전 iOS 등)
+  }
+}
+
+function requestGps() {
+  hideLocSheet();
+  wantGps = true;
+  manual = false;
+  followMap = true;
+  $("urgentSub").textContent = "위치 확인 중…";
+  $("status").textContent = "위치를 확인하는 중이에요. 브라우저가 물어보면 허용을 눌러 주세요.";
+  stopWatch();
+  startWatch(); // 버튼을 누른 순간 호출해야 브라우저의 권한 창이 뜸
+}
+
+async function initLocation() {
+  if (!navigator.geolocation) {
+    $("status").textContent = "이 브라우저는 위치 기능을 지원하지 않아요. 지도를 눌러 위치를 선택하세요.";
+    return;
+  }
+  const state = await permissionState();
+  if (state === "granted") { wantGps = true; startWatch(); }
+  else if (state === "denied") showLocSheet("denied");
+  else showLocSheet("ask"); // "prompt" 또는 알 수 없음
+}
+
+$("locAllow").addEventListener("click", requestGps);
+$("locRetry").addEventListener("click", requestGps);
+$("locLater").addEventListener("click", () => {
+  hideLocSheet();
+  $("status").textContent = "서울시청 기준으로 보여드려요. 오른쪽 아래 ◎ 버튼을 누르면 언제든 내 위치를 켤 수 있어요. " + statusText();
+});
+$("locClose").addEventListener("click", () => {
+  hideLocSheet();
+  $("status").textContent = "지도를 눌러 내 위치를 직접 고를 수 있어요. ◎ 버튼으로 위치 권한을 다시 시도할 수 있어요. " + statusText();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("locSheet").hidden) hideLocSheet(); });
 
 function startWatch() {
   if (!navigator.geolocation) {
@@ -272,10 +348,16 @@ function stopWatch() {
   watchId = null;
 }
 
-// ◎ 버튼: GPS 위치로 되돌아가기
-function locate() {
+// ◎ 버튼: GPS 위치로 되돌아가기 (권한이 없으면 안내 창)
+async function locate() {
+  if (!gps) {
+    const state = await permissionState();
+    if (state === "denied") return showLocSheet("denied");
+    if (state !== "granted") return showLocSheet("ask");
+  }
   manual = false;
   followMap = true;
+  wantGps = true;
   $("urgentSub").textContent = "위치 확인 중…";
   // 마지막 GPS 위치로 바로 돌아가고, 새로 위치를 다시 받기 시작
   if (gps) onPosition({ coords: { latitude: gps.lat, longitude: gps.lng, accuracy: gps.acc }, timestamp: gps.time });
@@ -293,7 +375,7 @@ function setManual(lat, lng) {
 // 화면이 꺼지거나 다른 앱으로 가면 배터리를 위해 멈추고, 돌아오면 다시 시작
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) stopWatch();
-  else startWatch();
+  else if (wantGps) startWatch();
 });
 
 // ── 이벤트 ─────────────────────────────────────────
@@ -316,4 +398,6 @@ $("urgent").addEventListener("click", () => {
   window.open(directionLinks(nearest).kakao, "_blank", "noopener");
 });
 
-startWatch();
+// 시작: 일단 서울시청 기준 목록을 바로 보여 주고, 위치 권한 상태에 따라 안내
+search();
+initLocation();

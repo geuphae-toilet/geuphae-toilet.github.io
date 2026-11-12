@@ -20,6 +20,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* display:flex 같은 규칙이 hidden을 덮어쓰지 않게 */
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px;
@@ -109,7 +110,34 @@ select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid 
 .wc-pin.hot { background: var(--urgent); }
 .item .note { color: var(--fg); }
 
+/* 위치 권한 안내: 모바일은 아래에서 올라오는 시트, 넓은 화면은 가운데 카드 */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.sheet {
+  width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto;
+  background: var(--surface); color: var(--fg); border-radius: 18px; padding: 22px 20px 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+.sheet > div { display: flex; flex-direction: column; gap: 10px; }
+.sheet-icon { font-size: 34px; line-height: 1; }
+.sheet h2 { margin: 0; font-size: 19px; font-weight: 900; line-height: 1.35; text-wrap: balance; }
+.sheet p { margin: 0; line-height: 1.55; color: var(--muted); }
+.sheet-small { font-size: 13px; }
+.sheet-warn { background: var(--chip); color: var(--fg) !important; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.sheet-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5; }
+.sheet-primary, .sheet-secondary {
+  font: inherit; border-radius: 12px; padding: 13px 14px; cursor: pointer; width: 100%;
+}
+.sheet-primary { border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 16px; margin-top: 4px; }
+.sheet-secondary { border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 14px; }
+.sheet-primary:focus-visible, .sheet-secondary:focus-visible { outline: 3px solid var(--urgent); outline-offset: 2px; }
+
 @media (max-width: 760px) {
+  .sheet-backdrop { align-items: flex-end; padding-bottom: 0; }
+  .sheet { max-width: none; border-radius: 18px 18px 0 0; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   .layout { grid-template-columns: 1fr; grid-template-rows: 45vh 1fr; }
   .panel { border-left: 0; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left)); }
   .hint { display: none; }
