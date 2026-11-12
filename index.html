@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>급할때 화장실</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">WC</span>
+      <div>
+        <h1>급할때 화장실</h1>
+        <p class="region" id="regionLabel">서울특별시</p>
+      </div>
+    </div>
+    <label class="radius">
+      반경
+      <select id="radius">
+        <option value="500">500m</option>
+        <option value="1000" selected>1km</option>
+        <option value="2000">2km</option>
+      </select>
+    </label>
+  </header>
+
+  <main class="layout">
+    <section class="mapwrap">
+      <div id="map" aria-label="주변 화장실 지도"></div>
+      <button id="locate" class="fab" title="내 위치로">◎</button>
+      <p class="hint">지도를 길게 누르거나 클릭하면 그 지점 기준으로 찾습니다</p>
+    </section>
+
+    <section class="panel">
+      <button id="urgent" class="urgent">
+        <strong>지금 가장 가까운 화장실</strong>
+        <span id="urgentSub">위치 확인 중…</span>
+      </button>
+
+      <div class="filters" role="group" aria-label="필터">
+        <label class="chip"><input type="checkbox" id="fFree" /> 무료</label>
+        <label class="chip"><input type="checkbox" id="f24" /> 24시간</label>
+        <label class="chip"><input type="checkbox" id="fAcc" /> 장애인</label>
+        <label class="chip"><input type="checkbox" id="fBaby" /> 기저귀대</label>
+      </div>
+
+      <p id="status" class="status" role="status"></p>
+      <ol id="list" class="list"></ol>
+      <p class="source">데이터: 행정안전부 전국공중화장실표준데이터(공공누리), © OpenStreetMap 기여자. 실제 개방 여부는 현장 상황과 다를 수 있습니다.</p>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
