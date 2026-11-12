@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=20261112c" />
+  <link rel="stylesheet" href="styles.css?v=20261112d" />
 </head>
 <body>
   <header class="top">
@@ -21,6 +21,11 @@
     <label class="radius">
       반경
       <select id="radius">
+        <option value="10">10m</option>
+        <option value="30">30m</option>
+        <option value="50">50m</option>
+        <option value="100">100m</option>
+        <option value="200">200m</option>
         <option value="500">500m</option>
         <option value="1000" selected>1km</option>
         <option value="2000">2km</option>
@@ -55,6 +60,6 @@
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="js/app.js?v=20261112c"></script>
+  <script type="module" src="js/app.js?v=20261112d"></script>
 </body>
 </html>
