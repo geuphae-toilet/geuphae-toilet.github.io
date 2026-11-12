@@ -1,5 +1,5 @@
-import { activeRegions, regionOf } from "./regions.js?v=20261112g";
-import { loadRegion } from "./dataSource.js?v=20261112g";
+import { activeRegions, regionOf } from "./regions.js?v=20261112h";
+import { loadRegion } from "./dataSource.js?v=20261112h";
 
 const $ = (id) => document.getElementById(id);
 const DEFAULT = activeRegions()[0];
@@ -27,8 +27,15 @@ const meMarker = L.marker(DEFAULT.center, {
 const radiusCircle = L.circle(DEFAULT.center, { radius: 1000, color: "#0f7b6c", weight: 1, fillOpacity: 0.04 }).addTo(map);
 const toiletLayer = L.layerGroup().addTo(map);
 
-const pinIcon = (hot) =>
-  L.divIcon({ className: "", html: `<div class="wc-pin${hot ? " hot" : ""}"><span>WC</span></div>`, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26] });
+// 가장 가까운 곳은 주황(hot), 카페 매장은 초록에 '카페' 표시
+const pinIcon = (hot, t) => {
+  const cafe = t?.kind === "cafe";
+  return L.divIcon({
+    className: "",
+    html: `<div class="wc-pin${cafe ? " cafe" : ""}${hot ? " hot" : ""}"><span>${cafe ? "카페" : "WC"}</span></div>`,
+    iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26],
+  });
+};
 
 // ── 상태 ───────────────────────────────────────────
 let origin = { lat: DEFAULT.center[0], lng: DEFAULT.center[1], fromGps: false };
@@ -80,7 +87,7 @@ function render() {
   list.forEach((t, i) => {
     const links = directionLinks(t);
     const tags = [
-      t.kind === "station" ? "역" : t.kind === "facility" ? "건물 내" : "공중",
+      t.kind === "station" ? "역" : t.kind === "facility" ? "건물 내" : t.kind === "cafe" ? (t.brandLabel || "카페") : "공중",
       t.gate === "outside" ? "개찰구 밖" : t.gate === "inside" ? "개찰구 안(교통카드 필요)" : null,
       is24h(t) ? "24시간" : t.hours ? esc(t.hours) : null,
       t.free === true ? "무료" : t.free === false ? "유료" : null,
@@ -92,9 +99,9 @@ function render() {
     ].filter(Boolean);
     const sourceLabel = t.sources?.includes("public") ? "공공데이터" : "OSM";
 
-    const popup = `<b>${esc(t.name)}</b><br>${t.detail ? esc(t.detail) + "<br>" : t.address ? esc(t.address) + "<br>" : ""}${fmtDist(t.dist)} · 도보 약 ${walkMin(t.dist)}분<br>
+    const popup = `<b>${esc(t.name)}</b><br>${t.detail ? esc(t.detail) + "<br>" : t.address ? esc(t.address) + "<br>" : ""}${t.note ? esc(t.note) + "<br>" : ""}${fmtDist(t.dist)} · 도보 약 ${walkMin(t.dist)}분<br>
       <a href="${links.kakao}" target="_blank" rel="noopener">카카오맵 길찾기</a>`;
-    const m = L.marker([t.lat, t.lng], { icon: pinIcon(i === 0) }).bindPopup(popup).addTo(toiletLayer);
+    const m = L.marker([t.lat, t.lng], { icon: pinIcon(i === 0, t) }).bindPopup(popup).addTo(toiletLayer);
 
     const li = document.createElement("li");
     li.className = "item";
@@ -104,6 +111,7 @@ function render() {
       <span class="dist">${fmtDist(t.dist)}</span>
       <span class="meta">도보 약 ${walkMin(t.dist)}분 ${tags.map((x) => `<span class="tag">${x}</span>`).join("")}<span class="src">${sourceLabel}</span></span>
       ${t.detail ? `<span class="addr"><b>위치:</b> ${esc(t.detail)}</span>` : ""}
+      ${t.note ? `<span class="addr note">${esc(t.note)}</span>` : ""}
       ${t.address ? `<span class="addr">${esc(t.address)}</span>` : ""}
       <span class="go">
         <a href="${links.kakao}" target="_blank" rel="noopener">카카오맵 길찾기</a>

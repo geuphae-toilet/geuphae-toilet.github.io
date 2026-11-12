@@ -18,13 +18,36 @@ function distance(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+async function readDir(dir) {
+  let names = [];
+  try { names = (await readdir(file(dir))).filter((f) => f.endsWith(".json")); } catch {}
+  const all = [];
+  for (const f of names) all.push(...((await readJson(`${dir}${f}`))?.toilets ?? []));
+  return all;
+}
+
 export async function mergeRegion(id) {
-  const osm = (await readJson(`osm/${id}.json`))?.toilets ?? [];
+  let osm = (await readJson(`osm/${id}.json`))?.toilets ?? [];
   // data/public/<id>/ 안의 모든 공공데이터 파일 (지하철, 전국 표준 등)
-  let pubFiles = [];
-  try { pubFiles = (await readdir(file(`public/${id}/`))).filter((f) => f.endsWith(".json")); } catch {}
-  const pub = [];
-  for (const f of pubFiles) pub.push(...((await readJson(`public/${id}/${f}`))?.toilets ?? []));
+  const pub = await readDir(`public/${id}/`);
+
+  // data/brands/<id>/ 안의 프랜차이즈 매장 (스타벅스 등).
+  // 같은 매장이 OSM 화장실 목록에도 있으면(같은 OSM id) 하나로 합치고 OSM 쪽 화장실 정보를 보탭니다.
+  const osmById = new Map(osm.map((o) => [o.id, o]));
+  const brandSeen = new Set();
+  const brands = (await readDir(`brands/${id}/`))
+    .filter((b) => !brandSeen.has(b.id) && brandSeen.add(b.id))
+    .map((b) => {
+      const o = osmById.get(b.id);
+      return {
+        ...b,
+        hours: b.hours ?? o?.hours ?? null,
+        accessible: b.accessible || !!o?.accessible,
+        babyChange: b.babyChange || !!o?.babyChange,
+        sources: o ? ["brand", "osm"] : ["brand"],
+      };
+    });
+  osm = osm.filter((o) => !brandSeen.has(o.id));
 
   // 약 0.001도(≈100m) 격자로 OSM 지점을 나눠 두고 근처 칸만 비교
   const grid = new Map();
@@ -61,15 +84,16 @@ export async function mergeRegion(id) {
   });
 
   osm.forEach((o, i) => { if (!used.has(i)) merged.push({ ...o, sources: ["osm"] }); });
+  merged.push(...brands);
 
   const out = {
     region: id,
     updated: new Date().toISOString().slice(0, 10),
-    counts: { total: merged.length, public: pub.length, osm: osm.length, matched: used.size },
+    counts: { total: merged.length, public: pub.length, osm: osm.length, matched: used.size, brands: brands.length },
     toilets: merged,
   };
   await writeFile(file(`${id}.json`), JSON.stringify(out));
-  console.log(`[${id}] 병합 완료: 공공 ${pub.length} + OSM ${osm.length} (겹침 ${used.size}) → 총 ${merged.length}곳`);
+  console.log(`[${id}] 병합 완료: 공공 ${pub.length} + OSM ${osm.length} (겹침 ${used.size}) + 매장 ${brands.length} → 총 ${merged.length}곳`);
   return out;
 }
 

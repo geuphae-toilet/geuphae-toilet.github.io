@@ -51,3 +51,13 @@ node scripts/import-public.mjs "C:\경로\공중화장실정보.csv"
 1. `js/regions.js`에서 해당 지역의 `enabled`를 `true`로 바꿉니다 (부산, 인천, 경기는 예시로 들어 있음).
 2. `node scripts/build-data.mjs busan` 으로 OSM 데이터를 받습니다.
 3. `node scripts/import-public.mjs <CSV> busan` 으로 공공데이터를 합칩니다.
+
+## 화장실을 쓸 수 있는 매장 (스타벅스)
+
+스타벅스 매장 위치를 OpenStreetMap에서 받아 함께 보여 줍니다 (서울 약 430곳, 지도에 초록 '카페' 핀).
+
+```bash
+node scripts/build-brands.mjs
+```
+
+다른 프랜차이즈를 추가하려면 `scripts/build-brands.mjs`의 `BRANDS` 배열에 항목을 추가하세요.

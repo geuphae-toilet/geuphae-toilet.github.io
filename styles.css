@@ -104,7 +104,10 @@ select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid 
   display: grid; place-items: center;
 }
 .wc-pin span { transform: rotate(45deg); color: #fff; font: 900 10px var(--font); }
+.wc-pin.cafe { background: #00704a; }
+.wc-pin.cafe span { font-size: 8px; }
 .wc-pin.hot { background: var(--urgent); }
+.item .note { color: var(--fg); }
 
 @media (max-width: 760px) {
   .layout { grid-template-columns: 1fr; grid-template-rows: 45vh 1fr; }
