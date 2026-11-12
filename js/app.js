@@ -1,5 +1,5 @@
-import { activeRegions, regionOf } from "./regions.js?v=20261112d";
-import { loadRegion } from "./dataSource.js?v=20261112d";
+import { activeRegions, regionOf } from "./regions.js?v=20261112e";
+import { loadRegion } from "./dataSource.js?v=20261112e";
 
 const $ = (id) => document.getElementById(id);
 const DEFAULT = activeRegions()[0];
@@ -223,7 +223,8 @@ function onPosition(pos) {
   origin = { lat, lng, fromGps: true };
   meMarker.setLatLng([lat, lng]);
   if (followMap) {
-    map.setView([lat, lng], acc > 300 ? 15 : 17);
+    // 위치가 아주 부정확하면 넓게, 아니면 반경(1~5m)과 가장 가까운 곳이 보이게 크게 확대
+    map.setView([lat, lng], acc > 300 ? 16 : 18);
     followMap = false;
   }
   if (!searchedAt || distance(searchedAt, origin) > RESEARCH_MOVE_M || !allSorted.length) {
@@ -296,8 +297,7 @@ $("locate").addEventListener("click", locate);
 // 반경을 바꾸면 그 반경이 잘 보이는 확대 수준으로 지도를 맞춤
 $("radius").addEventListener("change", () => {
   const r = Number($("radius").value);
-  const zoom = r <= 30 ? 19 : r <= 100 ? 18 : r <= 200 ? 17 : r <= 500 ? 16 : r <= 1000 ? 15 : 14;
-  map.setView([origin.lat, origin.lng], zoom);
+  map.setView([origin.lat, origin.lng], 19); // 반경이 1~5m라 항상 최대 확대
   search();
 });
 ["fFree", "f24", "fAcc", "fBaby"].forEach((id) => $(id).addEventListener("change", render));
