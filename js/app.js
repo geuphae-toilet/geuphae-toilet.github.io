@@ -17,9 +17,12 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap",
 }).addTo(map);
 
+// 내 위치 점: 끌어서 위치를 직접 바로잡을 수 있음 (터치하기 쉽게 크게)
 const meMarker = L.marker(DEFAULT.center, {
-  icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }),
+  icon: L.divIcon({ className: "me-hit", html: '<div class="me-dot"></div>', iconSize: [40, 40], iconAnchor: [20, 20] }),
   zIndexOffset: 1000,
+  draggable: true,
+  title: "끌어서 내 위치 바로잡기",
 }).addTo(map);
 const radiusCircle = L.circle(DEFAULT.center, { radius: 1000, color: "#0f7b6c", weight: 1, fillOpacity: 0.04 }).addTo(map);
 const toiletLayer = L.layerGroup().addTo(map);
@@ -114,8 +117,21 @@ function render() {
     ? `${nearest.name} · ${fmtDist(nearest.dist)} · 도보 약 ${walkMin(nearest.dist)}분 → 바로 길찾기`
     : "주변에서 찾지 못했어요. 반경을 넓혀 보세요.";
 
-  if (!toilets.length) $("status").textContent = "이 반경 안에 등록된 화장실이 없어요. 반경을 넓혀 보세요.";
-  else $("status").textContent = `${origin.fromGps ? "내 위치" : "선택한 지점"} 기준 ${list.length}곳${list.length !== toilets.length ? ` (전체 ${toilets.length}곳 중)` : ""}`;
+  $("status").textContent = statusText();
+}
+
+function statusText() {
+  if (!toilets.length) return "이 반경 안에 등록된 화장실이 없어요. 반경을 넓혀 보세요.";
+  const list = filtered();
+  const count = `${list.length}곳${list.length !== toilets.length ? ` (전체 ${toilets.length}곳 중)` : ""}`;
+  if (!origin.fromGps) {
+    return `선택한 지점 기준 ${count}. ◎ 버튼을 누르면 내 위치로 돌아가요.`;
+  }
+  const acc = Math.round(gps?.acc ?? 0);
+  if (acc > POOR_ACCURACY_M) {
+    return `내 위치 기준 ${count}. 위치 오차가 커요(약 ±${acc}m). 위치를 더 잡는 중이에요. 실내라면 창가나 밖으로 나가거나, 파란 점을 끌어서 위치를 바로잡을 수 있어요.`;
+  }
+  return `내 위치 기준 ${count} (오차 약 ±${acc}m)`;
 }
 
 // ── 조회 ───────────────────────────────────────────
@@ -153,33 +169,108 @@ async function search() {
   }
 }
 
-function locate() {
+// ── 위치 ───────────────────────────────────────────
+// 휴대폰은 처음에 와이파이/기지국 기반의 대략적인 위치를 주고, GPS가 잡히면서 점점 정확해집니다.
+// 그래서 한 번만 받지 않고 계속 받아서 더 정확한 값이 오면 바꿉니다.
+const POOR_ACCURACY_M = 100;    // 이보다 오차가 크면 안내 문구 표시
+const RESEARCH_MOVE_M = 15;     // 이만큼 이상 움직였을 때만 목록 다시 계산
+let watchId = null;
+let gps = null;                 // 마지막으로 받은 GPS 값 {lat, lng, acc, time}
+let searchedAt = null;          // 마지막으로 목록을 계산한 위치
+let manual = false;             // 사용자가 지도를 눌러/점을 끌어 위치를 직접 정했으면 GPS 무시
+let followMap = true;           // 첫 위치를 받으면 지도를 그쪽으로 이동
+
+const accCircle = L.circle(DEFAULT.center, { radius: 0, color: "#2f6fed", weight: 1, fillOpacity: 0.12, interactive: false });
+
+function onPosition(pos) {
+  const { latitude: lat, longitude: lng, accuracy: acc } = pos.coords;
+  const prev = gps;
+  // 새 값을 쓰는 경우:
+  //  - 처음 받은 값이거나 더 정확해졌을 때
+  //  - 걷는 중: 새 값도 쓸 만큼 정확하고(±50m 이하 또는 이전과 비슷), 오차보다 멀리 움직였을 때
+  //  - 이전 값이 1분 넘게 오래됐을 때
+  // 정확한 위치를 받은 뒤 부정확한 값(실내·지하 진입 등)이 와도 덮어쓰지 않습니다.
+  const usable = prev && acc <= Math.max(50, prev.acc * 1.5);
+  const better = !prev || acc <= prev.acc
+    || (usable && distance(prev, { lat, lng }) > Math.max(acc, prev.acc, 20))
+    || pos.timestamp - prev.time > 60000;
+  if (!better) return;
+  gps = { lat, lng, acc, time: pos.timestamp };
+
+  accCircle.setLatLng([lat, lng]).setRadius(acc).addTo(map);
+  if (manual) return; // 직접 정한 위치를 유지 (◎ 버튼을 누르면 다시 GPS 사용)
+
+  origin = { lat, lng, fromGps: true };
+  meMarker.setLatLng([lat, lng]);
+  if (followMap) {
+    map.setView([lat, lng], acc > 300 ? 15 : 17);
+    followMap = false;
+  }
+  if (!searchedAt || distance(searchedAt, origin) > RESEARCH_MOVE_M || !toilets.length) {
+    searchedAt = { ...origin };
+    search();
+  } else {
+    $("status").textContent = statusText(); // 정확도 문구만 갱신
+  }
+}
+
+function onPositionError(err) {
+  if (gps) return; // 이미 위치를 받은 적이 있으면 일시적인 오류는 무시
+  if (err.code === err.PERMISSION_DENIED) stopWatch();
+  origin = { lat: DEFAULT.center[0], lng: DEFAULT.center[1], fromGps: false };
+  map.setView(DEFAULT.center, 16);
+  const why = err.code === err.PERMISSION_DENIED
+    ? "위치 권한이 없어 서울시청 기준으로 보여드려요. 휴대폰 설정에서 브라우저의 위치 권한을 켜 주세요."
+    : "위치를 아직 못 잡았어요. 서울시청 기준으로 먼저 보여드려요.";
+  search().then(() => { $("status").textContent = why + " " + $("status").textContent; });
+}
+
+function startWatch() {
   if (!navigator.geolocation) {
     $("status").textContent = "이 브라우저는 위치 기능을 지원하지 않아요. 지도를 눌러 위치를 선택하세요.";
     return search();
   }
-  $("urgentSub").textContent = "위치 확인 중…";
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      origin = { lat: pos.coords.latitude, lng: pos.coords.longitude, fromGps: true };
-      map.setView([origin.lat, origin.lng], 16);
-      search();
-    },
-    () => {
-      origin = { lat: DEFAULT.center[0], lng: DEFAULT.center[1], fromGps: false };
-      map.setView(DEFAULT.center, 16);
-      search().then(() => {
-        $("status").textContent = "위치 권한이 없어 서울시청 기준으로 보여드려요. 지도를 눌러 위치를 바꿀 수 있어요. " + $("status").textContent;
-      });
-    },
-    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-  );
+  if (watchId !== null) return;
+  watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
+    enableHighAccuracy: true, // GPS 사용
+    maximumAge: 0,            // 예전에 저장된 위치 쓰지 않기
+    timeout: 20000,
+  });
+}
+function stopWatch() {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
 }
 
-// ── 이벤트 ─────────────────────────────────────────
-map.on("click", (ev) => {
-  origin = { lat: ev.latlng.lat, lng: ev.latlng.lng, fromGps: false };
+// ◎ 버튼: GPS 위치로 되돌아가기
+function locate() {
+  manual = false;
+  followMap = true;
+  $("urgentSub").textContent = "위치 확인 중…";
+  // 마지막 GPS 위치로 바로 돌아가고, 새로 위치를 다시 받기 시작
+  if (gps) onPosition({ coords: { latitude: gps.lat, longitude: gps.lng, accuracy: gps.acc }, timestamp: gps.time });
+  stopWatch();
+  startWatch();
+}
+
+function setManual(lat, lng) {
+  manual = true;
+  origin = { lat, lng, fromGps: false };
+  searchedAt = { ...origin };
   search();
+}
+
+// 화면이 꺼지거나 다른 앱으로 가면 배터리를 위해 멈추고, 돌아오면 다시 시작
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopWatch();
+  else startWatch();
+});
+
+// ── 이벤트 ─────────────────────────────────────────
+map.on("click", (ev) => setManual(ev.latlng.lat, ev.latlng.lng));
+meMarker.on("dragend", () => {
+  const p = meMarker.getLatLng();
+  setManual(p.lat, p.lng);
 });
 $("locate").addEventListener("click", locate);
 $("radius").addEventListener("change", search);
@@ -190,4 +281,4 @@ $("urgent").addEventListener("click", () => {
   window.open(directionLinks(nearest).kakao, "_blank", "noopener");
 });
 
-locate();
+startWatch();
